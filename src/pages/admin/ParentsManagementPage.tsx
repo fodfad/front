@@ -14,7 +14,7 @@ interface Parent {
   lastActive: string;
 }
 
-const parents: Parent[] = [
+const initialParents: Parent[] = [
   { id: 1, name: 'Marie Dupont', email: 'marie.dupont@email.com', phone: '+33 6 12 34 56 78', childrenCount: 2, status: 'active', joinDate: '2024-01-15', lastActive: 'Il y a 2h' },
   { id: 2, name: 'Jean Martin', email: 'jean.martin@email.com', phone: '+33 6 98 76 54 32', childrenCount: 1, status: 'active', joinDate: '2024-02-20', lastActive: 'Il y a 1 jour' },
   { id: 3, name: 'Sophie Bernard', email: 'sophie.b@email.com', phone: '+33 6 55 44 33 22', childrenCount: 3, status: 'active', joinDate: '2024-03-10', lastActive: 'Il y a 5h' },
@@ -22,8 +22,61 @@ const parents: Parent[] = [
 ];
 
 export default function ParentsManagementPage() {
+  const [parents, setParents] = useState<Parent[]>(initialParents);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedParent, setSelectedParent] = useState<Parent | null>(null);
+
+  const [showModal, setShowModal] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [formData, setFormData] = useState({ name: '', email: '', phone: '', status: 'active' as 'active' | 'inactive' });
+
+  const handleAddOrEditParent = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingId) {
+      setParents(parents.map(parent => 
+        parent.id === editingId 
+          ? { ...parent, ...formData } 
+          : parent
+      ));
+    } else {
+      const newParent: Parent = {
+        id: parents.length > 0 ? Math.max(...parents.map(p => p.id)) + 1 : 1,
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        status: formData.status,
+        childrenCount: 0,
+        joinDate: new Date().toISOString().split('T')[0],
+        lastActive: 'À l\'instant'
+      };
+      setParents([...parents, newParent]);
+    }
+    closeModal();
+  };
+
+  const handleEdit = (parent: Parent) => {
+    setFormData({ name: parent.name, email: parent.email, phone: parent.phone, status: parent.status });
+    setEditingId(parent.id);
+    setShowModal(true);
+  };
+
+  const handleDelete = (id: number) => {
+    if (window.confirm('Êtes-vous sûr de vouloir supprimer ce parent ?')) {
+      setParents(parents.filter(parent => parent.id !== id));
+    }
+  };
+
+  const openAddModal = () => {
+    setFormData({ name: '', email: '', phone: '', status: 'active' });
+    setEditingId(null);
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setFormData({ name: '', email: '', phone: '', status: 'active' });
+    setEditingId(null);
+  };
 
   const filteredParents = parents.filter(parent =>
     parent.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -46,6 +99,7 @@ export default function ParentsManagementPage() {
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
+          onClick={openAddModal}
           className="flex items-center gap-2 bg-gradient-to-r from-rose-500 to-orange-500 text-white px-6 py-3 rounded-2xl shadow-lg hover:shadow-2xl transition-all"
         >
           <UserPlus className="w-5 h-5" />
@@ -146,10 +200,16 @@ export default function ParentsManagementPage() {
                       >
                         <Eye className="w-4 h-4" />
                       </button>
-                      <button className="p-2 text-rose-600 hover:bg-rose-100 rounded-lg transition-all">
+                      <button 
+                        onClick={() => handleEdit(parent)}
+                        className="p-2 text-rose-600 hover:bg-rose-100 rounded-lg transition-all"
+                      >
                         <Edit2 className="w-4 h-4" />
                       </button>
-                      <button className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-all">
+                      <button 
+                        onClick={() => handleDelete(parent.id)}
+                        className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-all"
+                      >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -238,6 +298,107 @@ export default function ParentsManagementPage() {
                     </div>
                   </div>
                 </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Add/Edit Parent Modal */}
+      <AnimatePresence>
+        {showModal && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={closeModal}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none"
+            >
+              <div className="bg-white rounded-3xl p-8 w-full max-w-md mx-4 shadow-2xl pointer-events-auto">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-foreground bg-gradient-to-r from-rose-600 to-orange-600 bg-clip-text text-transparent">
+                    {editingId ? 'Modifier le Parent' : 'Ajouter un Parent'}
+                  </h2>
+                  <button
+                    onClick={closeModal}
+                    className="p-2 hover:bg-accent rounded-xl transition-all"
+                  >
+                    <X className="w-5 h-5 text-muted-foreground" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleAddOrEditParent} className="space-y-5">
+                  <div>
+                    <label className="block mb-2 text-foreground text-sm">Nom complet</label>
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      placeholder="Ex: Jean Dupont"
+                      className="w-full px-4 py-3 bg-white/50 border-2 border-border rounded-2xl focus:outline-none focus:border-rose-500 transition-all"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block mb-2 text-foreground text-sm">Email</label>
+                    <input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      placeholder="Ex: jean.dupont@email.com"
+                      className="w-full px-4 py-3 bg-white/50 border-2 border-border rounded-2xl focus:outline-none focus:border-rose-500 transition-all"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block mb-2 text-foreground text-sm">Téléphone</label>
+                    <input
+                      type="tel"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      placeholder="Ex: +33 6 12 34 56 78"
+                      className="w-full px-4 py-3 bg-white/50 border-2 border-border rounded-2xl focus:outline-none focus:border-rose-500 transition-all"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block mb-2 text-foreground text-sm">Statut</label>
+                    <select
+                      value={formData.status}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value as 'active' | 'inactive' })}
+                      className="w-full px-4 py-3 bg-white/50 border-2 border-border rounded-2xl focus:outline-none focus:border-rose-500 transition-all"
+                    >
+                      <option value="active">Actif</option>
+                      <option value="inactive">Inactif</option>
+                    </select>
+                  </div>
+
+                  <div className="flex gap-3 pt-4">
+                    <button
+                      type="button"
+                      onClick={closeModal}
+                      className="flex-1 px-4 py-3 border-2 border-border rounded-2xl hover:bg-accent transition-all"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 px-4 py-3 bg-gradient-to-r from-rose-500 to-orange-500 text-white rounded-2xl hover:shadow-2xl transition-all"
+                    >
+                      {editingId ? 'Modifier' : 'Ajouter'}
+                    </button>
+                  </div>
+                </form>
               </div>
             </motion.div>
           </>

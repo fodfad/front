@@ -20,24 +20,58 @@ export default function ChildrenPage() {
 
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({ name: '', birthdate: '', gender: '' });
+  const [editingId, setEditingId] = useState<number | null>(null);
 
-  const handleAddChild = (e: React.FormEvent) => {
+  const handleAddOrEditChild = (e: React.FormEvent) => {
     e.preventDefault();
     const birthYear = new Date(formData.birthdate).getFullYear();
     const currentYear = new Date().getFullYear();
     const age = currentYear - birthYear;
 
-    const newChild: Child = {
-      id: children.length + 1,
-      name: formData.name,
-      birthdate: formData.birthdate,
-      gender: formData.gender,
-      age: `${age} ans`,
-    };
+    if (editingId) {
+      setChildren(children.map(child => 
+        child.id === editingId 
+          ? { ...child, name: formData.name, birthdate: formData.birthdate, gender: formData.gender, age: `${age} ans` } 
+          : child
+      ));
+    } else {
+      const newChild: Child = {
+        id: children.length > 0 ? Math.max(...children.map(c => c.id)) + 1 : 1,
+        name: formData.name,
+        birthdate: formData.birthdate,
+        gender: formData.gender,
+        age: `${age} ans`,
+      };
+      setChildren([...children, newChild]);
+    }
 
-    setChildren([...children, newChild]);
+    closeModal();
+  };
+
+  const handleEdit = (child: Child, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setFormData({ name: child.name, birthdate: child.birthdate, gender: child.gender });
+    setEditingId(child.id);
+    setShowModal(true);
+  };
+
+  const handleDelete = (id: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (window.confirm('Êtes-vous sûr de vouloir supprimer cet enfant ?')) {
+      setChildren(children.filter(child => child.id !== id));
+    }
+  };
+
+  const openAddModal = () => {
+    setFormData({ name: '', birthdate: '', gender: '' });
+    setEditingId(null);
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
     setShowModal(false);
     setFormData({ name: '', birthdate: '', gender: '' });
+    setEditingId(null);
   };
 
   const getInitials = (name: string) => {
@@ -80,10 +114,18 @@ export default function ChildrenPage() {
                     <span className="text-white text-xl">{getInitials(child.name)}</span>
                   </div>
                   <div className="flex gap-2">
-                    <button className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-all">
+                    <button 
+                      onClick={(e) => handleEdit(child, e)}
+                      className="p-2 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-all"
+                      title="Modifier"
+                    >
                       <Edit2 className="w-4 h-4" />
                     </button>
-                    <button className="p-2 text-rose-600 hover:bg-rose-100 rounded-lg transition-all">
+                    <button 
+                      onClick={(e) => handleDelete(child.id, e)}
+                      className="p-2 text-rose-600 hover:bg-rose-100 rounded-lg transition-all"
+                      title="Supprimer"
+                    >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -123,7 +165,7 @@ export default function ChildrenPage() {
         transition={{ delay: 0.5, type: "spring", stiffness: 200 }}
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.9 }}
-        onClick={() => setShowModal(true)}
+        onClick={openAddModal}
         className="fixed bottom-8 right-8 w-16 h-16 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full shadow-2xl flex items-center justify-center hover:shadow-indigo-500/50 transition-all z-50"
       >
         <Plus className="w-8 h-8 text-white" />
@@ -137,7 +179,7 @@ export default function ChildrenPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setShowModal(false)}
+              onClick={closeModal}
               className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
             />
             <motion.div
@@ -149,17 +191,17 @@ export default function ChildrenPage() {
               <div className="bg-white rounded-3xl p-8 w-full max-w-md mx-4 shadow-2xl pointer-events-auto">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-foreground bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                    Ajouter un enfant
+                    {editingId ? 'Modifier un enfant' : 'Ajouter un enfant'}
                   </h2>
                   <button
-                    onClick={() => setShowModal(false)}
+                    onClick={closeModal}
                     className="p-2 hover:bg-accent rounded-xl transition-all"
                   >
                     <X className="w-5 h-5 text-muted-foreground" />
                   </button>
                 </div>
 
-                <form onSubmit={handleAddChild} className="space-y-5">
+                <form onSubmit={handleAddOrEditChild} className="space-y-5">
                   <div>
                     <label htmlFor="name" className="block mb-2 text-foreground text-sm">
                       Nom complet
@@ -225,7 +267,7 @@ export default function ChildrenPage() {
                   <div className="flex gap-3 pt-4">
                     <button
                       type="button"
-                      onClick={() => setShowModal(false)}
+                      onClick={closeModal}
                       className="flex-1 px-4 py-3 border-2 border-border rounded-2xl hover:bg-accent transition-all"
                     >
                       Annuler
@@ -234,7 +276,7 @@ export default function ChildrenPage() {
                       type="submit"
                       className="flex-1 px-4 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-2xl hover:shadow-2xl transition-all"
                     >
-                      Ajouter
+                      {editingId ? 'Modifier' : 'Ajouter'}
                     </button>
                   </div>
                 </form>

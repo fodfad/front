@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import ChildrenPage from './pages/ChildrenPage';
 import QuestionnairePage from './pages/QuestionnairePage';
@@ -31,6 +32,9 @@ export default function App() {
 
         {/* Login */}
         <Route path="/login" element={<LoginPage />} />
+        
+        {/* Register */}
+        <Route path="/register" element={<RegisterPage />} />
 
         {/* ================= PARENT ROUTES ================= */}
 

@@ -1,5 +1,5 @@
-import { LayoutDashboard, Users, FileText, BarChart3, TrendingUp, BookOpen, Sparkles } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { LayoutDashboard, Users, FileText, BarChart3, TrendingUp, BookOpen, Sparkles, LogOut } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
 const menuItems = [
@@ -13,6 +13,11 @@ const menuItems = [
 
 export default function Sidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    navigate('/login');
+  };
 
   return (
     <div className="w-72 bg-white/80 backdrop-blur-xl border-r border-border/50 h-screen fixed left-0 top-0 flex flex-col shadow-xl">
@@ -60,7 +65,7 @@ export default function Sidebar() {
         })}
       </nav>
 
-      <div className="p-4">
+      <div className="p-4 space-y-4">
         <div className="bg-gradient-to-br from-indigo-50 to-purple-50 p-4 rounded-xl border border-indigo-100">
           <p className="text-sm text-foreground mb-1">Besoin d'aide ?</p>
           <p className="text-xs text-muted-foreground mb-3">Contactez notre support</p>
@@ -68,6 +73,14 @@ export default function Sidebar() {
             Support 24/7
           </button>
         </div>
+        
+        <button 
+          onClick={handleLogout}
+          className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-100 transition-all"
+        >
+          <LogOut className="w-5 h-5" />
+          <span>Déconnexion</span>
+        </button>
       </div>
     </div>
   );

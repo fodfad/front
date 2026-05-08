@@ -121,13 +121,14 @@
 
 @layer base {
   * {
-    @apply border-[var(--border)] outline-ring/50;
+    border-color: var(--border);
+    outline-color: var(--ring);
   }
 
   body {
-    @apply bg-background text-foreground;
-  }
-
+    background-color: var(--background);
+    color: var(--foreground);
+}
   /**
   * Default typography styles for HTML elements (h1-h4, p, label, button, input).
   * These are in @layer base, so Tailwind utility classes (like text-sm, text-lg) automatically override them.

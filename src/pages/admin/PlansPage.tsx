@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import { AdminLayout } from '../../components/AdminLayout';
-import { Plus, Target, TrendingUp, Calendar, User } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Plus, Target, TrendingUp, Calendar, User, Edit2, Trash2, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface Plan {
   id: number;
@@ -13,13 +14,77 @@ interface Plan {
   progress: number;
 }
 
-const plans: Plan[] = [
+const initialPlans: Plan[] = [
   { id: 1, childName: 'Emma Dupont', title: 'Plan de développement social', objectives: 8, completedObjectives: 5, startDate: '2024-01-15', nextReview: '2024-06-15', progress: 62 },
   { id: 2, childName: 'Lucas Martin', title: 'Communication et langage', objectives: 12, completedObjectives: 7, startDate: '2024-02-01', nextReview: '2024-07-01', progress: 58 },
   { id: 3, childName: 'Thomas Dubois', title: 'Gestion des émotions', objectives: 10, completedObjectives: 3, startDate: '2024-03-10', nextReview: '2024-08-10', progress: 30 },
 ];
 
 export default function PlansPage() {
+  const [plans, setPlans] = useState<Plan[]>(initialPlans);
+  const [showModal, setShowModal] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [formData, setFormData] = useState({
+    childName: '',
+    title: '',
+    objectives: 1,
+    completedObjectives: 0,
+    startDate: '',
+    nextReview: ''
+  });
+
+  const handleAddOrEditPlan = (e: React.FormEvent) => {
+    e.preventDefault();
+    const progress = Math.round((formData.completedObjectives / formData.objectives) * 100) || 0;
+
+    if (editingId) {
+      setPlans(plans.map(plan => 
+        plan.id === editingId 
+          ? { ...plan, ...formData, progress } 
+          : plan
+      ));
+    } else {
+      const newPlan: Plan = {
+        id: plans.length > 0 ? Math.max(...plans.map(p => p.id)) + 1 : 1,
+        ...formData,
+        progress
+      };
+      setPlans([...plans, newPlan]);
+    }
+    closeModal();
+  };
+
+  const handleEdit = (plan: Plan) => {
+    setFormData({ 
+      childName: plan.childName, 
+      title: plan.title, 
+      objectives: plan.objectives,
+      completedObjectives: plan.completedObjectives,
+      startDate: plan.startDate,
+      nextReview: plan.nextReview
+    });
+    setEditingId(plan.id);
+    setShowModal(true);
+  };
+
+  const handleDelete = (id: number) => {
+    if (window.confirm('Êtes-vous sûr de vouloir supprimer ce plan ?')) {
+      setPlans(plans.filter(plan => plan.id !== id));
+    }
+  };
+
+  const openAddModal = () => {
+    setFormData({ childName: '', title: '', objectives: 1, completedObjectives: 0, startDate: '', nextReview: '' });
+    setEditingId(null);
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setFormData({ childName: '', title: '', objectives: 1, completedObjectives: 0, startDate: '', nextReview: '' });
+    setEditingId(null);
+  };
+
   return (
     <AdminLayout>
       <motion.div
@@ -36,6 +101,7 @@ export default function PlansPage() {
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
+          onClick={openAddModal}
           className="flex items-center gap-2 bg-gradient-to-r from-rose-500 to-orange-500 text-white px-6 py-3 rounded-2xl shadow-lg hover:shadow-2xl transition-all"
         >
           <Plus className="w-5 h-5" />
@@ -50,9 +116,24 @@ export default function PlansPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
-            className="bg-white/80 backdrop-blur-xl p-8 rounded-3xl shadow-xl border border-border/50"
+            className="bg-white/80 backdrop-blur-xl p-8 rounded-3xl shadow-xl border border-border/50 relative"
           >
-            <div className="flex items-start justify-between mb-6">
+            <div className="absolute top-6 right-6 flex gap-2">
+              <button 
+                onClick={() => handleEdit(plan)}
+                className="p-2 text-rose-600 hover:bg-rose-100 rounded-lg transition-all"
+              >
+                <Edit2 className="w-4 h-4" />
+              </button>
+              <button 
+                onClick={() => handleDelete(plan.id)}
+                className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-all"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex items-start justify-between mb-6 pr-20">
               <div>
                 <div className="flex items-center gap-3 mb-2">
                   <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
@@ -119,6 +200,124 @@ export default function PlansPage() {
           </motion.div>
         ))}
       </div>
+
+      <AnimatePresence>
+        {showModal && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={closeModal}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none"
+            >
+              <div className="bg-white rounded-3xl p-8 w-full max-w-xl mx-4 shadow-2xl pointer-events-auto max-h-[90vh] overflow-y-auto">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-foreground bg-gradient-to-r from-rose-600 to-orange-600 bg-clip-text text-transparent">
+                    {editingId ? 'Modifier le Plan' : 'Ajouter un Plan'}
+                  </h2>
+                  <button
+                    onClick={closeModal}
+                    className="p-2 hover:bg-accent rounded-xl transition-all"
+                  >
+                    <X className="w-5 h-5 text-muted-foreground" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleAddOrEditPlan} className="space-y-5">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block mb-2 text-foreground text-sm">Nom de l'enfant</label>
+                      <input
+                        type="text"
+                        value={formData.childName}
+                        onChange={(e) => setFormData({ ...formData, childName: e.target.value })}
+                        className="w-full px-4 py-3 bg-white/50 border-2 border-border rounded-2xl focus:outline-none focus:border-rose-500 transition-all"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block mb-2 text-foreground text-sm">Titre du plan</label>
+                      <input
+                        type="text"
+                        value={formData.title}
+                        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                        className="w-full px-4 py-3 bg-white/50 border-2 border-border rounded-2xl focus:outline-none focus:border-rose-500 transition-all"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block mb-2 text-foreground text-sm">Date de début</label>
+                      <input
+                        type="date"
+                        value={formData.startDate}
+                        onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                        className="w-full px-4 py-3 bg-white/50 border-2 border-border rounded-2xl focus:outline-none focus:border-rose-500 transition-all"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block mb-2 text-foreground text-sm">Date de révision</label>
+                      <input
+                        type="date"
+                        value={formData.nextReview}
+                        onChange={(e) => setFormData({ ...formData, nextReview: e.target.value })}
+                        className="w-full px-4 py-3 bg-white/50 border-2 border-border rounded-2xl focus:outline-none focus:border-rose-500 transition-all"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block mb-2 text-foreground text-sm">Total des objectifs</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={formData.objectives}
+                        onChange={(e) => setFormData({ ...formData, objectives: parseInt(e.target.value) || 1 })}
+                        className="w-full px-4 py-3 bg-white/50 border-2 border-border rounded-2xl focus:outline-none focus:border-rose-500 transition-all"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block mb-2 text-foreground text-sm">Objectifs complétés</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max={formData.objectives}
+                        value={formData.completedObjectives}
+                        onChange={(e) => setFormData({ ...formData, completedObjectives: parseInt(e.target.value) || 0 })}
+                        className="w-full px-4 py-3 bg-white/50 border-2 border-border rounded-2xl focus:outline-none focus:border-rose-500 transition-all"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-4">
+                    <button
+                      type="button"
+                      onClick={closeModal}
+                      className="flex-1 px-4 py-3 border-2 border-border rounded-2xl hover:bg-accent transition-all"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 px-4 py-3 bg-gradient-to-r from-rose-500 to-orange-500 text-white rounded-2xl hover:shadow-2xl transition-all"
+                    >
+                      {editingId ? 'Modifier' : 'Ajouter'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </AdminLayout>
   );
 }

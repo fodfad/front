@@ -1,5 +1,5 @@
 import { LayoutDashboard, Users, Baby, FileQuestion, BarChart3, BookOpen, ClipboardList, Settings, Shield, LogOut } from 'lucide-react';
-import { Link, useLocation } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
 const menuItems = [
@@ -15,6 +15,12 @@ const menuItems = [
 
 export function AdminSidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    // Dans un cas réel, vous videriez le localStorage ou l'état global ici
+    navigate('/login');
+  };
 
   return (
     <div className="w-72 bg-white/80 backdrop-blur-xl border-r border-border/50 h-screen fixed left-0 top-0 flex flex-col shadow-xl">
@@ -66,7 +72,10 @@ export function AdminSidebar() {
       </nav>
 
       <div className="p-4 border-t border-border/50">
-        <button className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-rose-600 hover:bg-rose-50 transition-all">
+        <button 
+          onClick={handleLogout}
+          className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-rose-600 hover:bg-rose-50 transition-all"
+        >
           <LogOut className="w-5 h-5" />
           <span>Déconnexion</span>
         </button>
