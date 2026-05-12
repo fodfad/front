@@ -1,44 +1,14 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --font-size: 16px;
-  --background: #F8FAFC;
-  --foreground: #0F172A;
-  --card: #ffffff;
-  --card-foreground: #0F172A;
-  --popover: #ffffff;
-  --popover-foreground: #0F172A;
-  --primary: #4F46E5;
-  --primary-foreground: #ffffff;
-  --secondary: #10B981;
-  --secondary-foreground: #ffffff;
-  --muted: #E2E8F0;
-  --muted-foreground: #64748B;
-  --accent: #EEF2FF;
-  --accent-foreground: #4F46E5;
-  --destructive: #EF4444;
-  --destructive-foreground: #ffffff;
-  --border: #E2E8F0;
-  --input: transparent;
-  --input-background: #ffffff;
-  --switch-background: #CBD5E1;
-  --font-weight-medium: 500;
-  --font-weight-normal: 400;
-  --ring: #4F46E5;
-  --chart-1: #4F46E5;
-  --chart-2: #10B981;
-  --chart-3: #F59E0B;
-  --chart-4: #EF4444;
-  --chart-5: #8B5CF6;
-  --radius: 1rem;
-  --sidebar: #ffffff;
-  --sidebar-foreground: #0F172A;
-  --sidebar-primary: #4F46E5;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #F8FAFC;
-  --sidebar-accent-foreground: #0F172A;
-  --sidebar-border: #E2E8F0;
-  --sidebar-ring: #4F46E5;
+  --primary: #2D7DD2;           /* violet #4F46E5 → bleu autisme */
+  --accent: #E8F1FB;            /* violet pâle #EEF2FF → bleu pâle */
+  --accent-foreground: #2D7DD2; /* violet #4F46E5 → bleu autisme */
+  --ring: #2D7DD2;              /* violet #4F46E5 → bleu autisme */
+  --chart-1: #2D7DD2;           /* violet #4F46E5 → bleu autisme */
+  --sidebar-primary: #2D7DD2;   /* violet #4F46E5 → bleu autisme */
+  --sidebar-ring: #2D7DD2;      /* violet #4F46E5 → bleu autisme */
+  --background: #EEF4FB;        /* était #F8FAFC */
 }
 
 .dark {

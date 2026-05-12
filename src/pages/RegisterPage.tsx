@@ -66,8 +66,8 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen flex relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 opacity-90"></div>
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
+      <div className="absolute inset-0 bg-gradient-to-br from-sky-400 via-blue-300 to-blue-100 opacity-90"></div>
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(45,125,210,0.3),rgba(255,255,255,0))]"></div>
 
       {/* Côté gauche - Illustration */}
       <motion.div

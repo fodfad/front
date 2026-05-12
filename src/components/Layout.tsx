@@ -1,4 +1,4 @@
-import  { ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import  Sidebar  from './Sidebar';
 import  Navbar  from './Navbar';
 
@@ -8,7 +8,7 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-purple-50/30">
+    <div className="min-h-screen bg-white">
       <Sidebar />
       <Navbar />
       <main className="ml-72 pt-20">

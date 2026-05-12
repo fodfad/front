@@ -18,7 +18,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   const initiale = displayName.charAt(0).toUpperCase();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-rose-50/30 to-orange-50/30">
+    <div className="min-h-screen bg-white">
       <AdminSidebar />
 
       {/* Top Navbar */}
