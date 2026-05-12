@@ -2,42 +2,55 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Mail, Lock, Sparkles, TrendingUp, Shield, Users } from 'lucide-react';
 import { motion } from 'framer-motion';
-import users from '../data/users';
+import apiClient from '../api/apiClient';
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-  
-    const user = users.find(
-      (u) => u.email === email && u.password === password
-    );
-  
-    if (!user) {
-      alert('Email ou mot de passe incorrect');
-      return;
-    }
-  
-    localStorage.setItem('role', user.role);
-  
-    if (user.role === 'admin') {
-      navigate('/admin/dashboard');
-    } else {
-      navigate('/dashboard');
+    setLoading(true);
+    setError('');
+
+    try {
+      // ── Connexion avec Spring Boot
+      const res = await apiClient.post('/auth/login', {
+        email,
+        motDePasse: password,
+      });
+
+      const user = res.data;
+
+      // ── Sauvegarde des données dans le localStorage
+      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('userId', String(user.id));
+      localStorage.setItem('userRole', user.role);
+      localStorage.setItem('role', user.role.toLowerCase());
+
+      // ── Redirection selon le rôle
+      if (user.role === 'ADMIN') {
+        navigate('/admin/dashboard');
+      } else {
+        navigate('/dashboard');
+      }
+
+    } catch (err: any) {
+      setError('Email ou mot de passe incorrect');
+    } finally {
+      setLoading(false);
     }
   };
-  
 
   return (
     <div className="min-h-screen flex relative overflow-hidden">
-      {/* Animated gradient background */}
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 opacity-90"></div>
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
 
-      {/* Left side - Illustration */}
+      {/* Left side */}
       <motion.div
         initial={{ opacity: 0, x: -50 }}
         animate={{ opacity: 1, x: 0 }}
@@ -97,7 +110,7 @@ export default function LoginPage() {
         </div>
       </motion.div>
 
-      {/* Right side - Login form with glassmorphism */}
+      {/* Right side - Login form */}
       <motion.div
         initial={{ opacity: 0, x: 50 }}
         animate={{ opacity: 1, x: 0 }}
@@ -110,6 +123,13 @@ export default function LoginPage() {
               <h2 className="text-foreground mb-2">Bienvenue 👋</h2>
               <p className="text-muted-foreground">Connectez-vous pour continuer</p>
             </div>
+
+            {/* ── Error message */}
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl">
+                <p className="text-red-600 text-sm text-center">{error}</p>
+              </div>
+            )}
 
             <form onSubmit={handleLogin} className="space-y-5">
               <div>
@@ -151,18 +171,32 @@ export default function LoginPage() {
               <div className="flex items-center justify-between text-sm">
                 <label className="flex items-center gap-2 cursor-pointer group">
                   <input type="checkbox" className="rounded border-border accent-primary" />
-                  <span className="text-muted-foreground group-hover:text-foreground transition-colors">Se souvenir</span>
+                  <span className="text-muted-foreground group-hover:text-foreground transition-colors">
+                    Se souvenir
+                  </span>
                 </label>
                 <a href="#" className="text-primary hover:underline">
                   Mot de passe oublié ?
                 </a>
               </div>
 
+              {/* ── Submit button avec loading */}
               <button
                 type="submit"
-                className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-4 rounded-2xl hover:shadow-2xl hover:scale-[1.02] transition-all shadow-lg"
+                disabled={loading}
+                className="w-full bg-sky-600 text-white py-4 rounded-2xl hover:shadow-2xl hover:scale-[1.02] transition-all shadow-lg disabled:opacity-70 disabled:cursor-not-allowed disabled:scale-100"
               >
-                Se connecter
+                {loading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                    </svg>
+                    Connexion...
+                  </span>
+                ) : (
+                  'Se connecter'
+                )}
               </button>
             </form>
 

@@ -1,283 +1,452 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Layout } from '../components/Layout';
-import { Save, Calendar, Moon, Smile, MessageCircle, AlertCircle } from 'lucide-react';
+import {
+  Save, Calendar, Moon, Smile, MessageCircle, AlertCircle,
+  Loader2, CheckCircle2, Sparkles, ChevronDown, ChevronUp
+} from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { motion } from 'framer-motion';
-
-const chartData = [
-  { date: '01/05', sleep: 9, behavior: 7, communication: 6, crises: 2 },
-  { date: '02/05', sleep: 8, behavior: 8, communication: 7, crises: 1 },
-  { date: '03/05', sleep: 10, behavior: 9, communication: 8, crises: 0 },
-  { date: '04/05', sleep: 9, behavior: 8, communication: 8, crises: 1 },
-];
+import { motion, AnimatePresence } from 'framer-motion';
+import apiClient from '../api/apiClient';
 
 interface TrackingEntry {
+  id?: number;
   date: string;
   sleep: number;
   behavior: number;
   communication: number;
   crises: number;
+  notes?: string;
 }
 
 export default function TrackingPage() {
-  const [sleep, setSleep] = useState(9);
-  const [behavior, setBehavior] = useState(7);
-  const [communication, setCommunication] = useState(6);
+  // ── Formulaire
+  const [sleep, setSleep] = useState(3);
+  const [behavior, setBehavior] = useState(3);
+  const [communication, setCommunication] = useState(3);
   const [crises, setCrises] = useState(1);
   const [notes, setNotes] = useState('');
 
-  const [history] = useState<TrackingEntry[]>([
-    { date: '2026-05-03', sleep: 10, behavior: 9, communication: 8, crises: 0 },
-    { date: '2026-05-02', sleep: 8, behavior: 8, communication: 7, crises: 1 },
-    { date: '2026-05-01', sleep: 9, behavior: 7, communication: 6, crises: 2 },
-  ]);
+  // ── États UI
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState('');
+  const [conseilsIA, setConseilsIA] = useState('');
+  const [showConseils, setShowConseils] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // ── Historique
+  const [history, setHistory] = useState<TrackingEntry[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+
+  // ── Enfant sélectionné
+  const enfantId = parseInt(localStorage.getItem('enfantId') || '0');
+  const enfantNom = localStorage.getItem('enfantPrenom') || 'votre enfant';
+
+  // ── Chargement de l'historique depuis GET /api/suivi/enfant/{id}
+  const loadHistorique = async () => {
+    if (!enfantId) { setLoadingHistory(false); return; }
+    try {
+      const res = await apiClient.get(`/suivi/enfant/${enfantId}`);
+      if (Array.isArray(res.data)) {
+        const mapped: TrackingEntry[] = res.data.map((s: any) => ({
+          id: s.id,
+          date: s.date || '',
+          sleep: s.qualiteSommeil ?? 0,
+          behavior: s.niveauComportement ?? 0,
+          communication: s.niveauCommunication ?? 0,
+          crises: s.nombreCrises ?? 0,
+          notes: s.notes || '',
+        }));
+        // Trier du plus récent au plus ancien
+        mapped.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        setHistory(mapped);
+      }
+    } catch (err) {
+      console.error('Erreur chargement historique:', err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  useEffect(() => {
+    loadHistorique();
+  }, []);
+
+  // ── Enregistrer un suivi via POST /api/suivi
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    alert('Suivi enregistré avec succès !');
+    setError('');
+    setSuccess(false);
+    setConseilsIA('');
+
+    if (!enfantId) {
+      setError('Veuillez d\'abord sélectionner un enfant dans la page "Enfants".');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const res = await apiClient.post('/suivi', {
+        enfantId,
+        sommeil: sleep,
+        comportement: behavior,
+        communication,
+        crises,
+        notes: notes.trim() || null,
+      });
+
+      // Afficher les conseils IA retournés
+      if (res.data?.contenuIA) {
+        setConseilsIA(res.data.contenuIA);
+        setShowConseils(true);
+      }
+
+      setSuccess(true);
+      setNotes('');
+      await loadHistorique();
+      setTimeout(() => setSuccess(false), 4000);
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Erreur lors de l\'enregistrement du suivi';
+      setError(msg);
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ── Données graphique (7 derniers suivis)
+  const chartData = [...history].reverse().slice(-7).map((h) => ({
+    date: h.date ? h.date.substring(5) : '', // MM-DD
+    Sommeil: h.sleep,
+    Comportement: h.behavior,
+    Communication: h.communication,
+    Crises: h.crises,
+  }));
+
+  // ── Label des niveaux
+  const niveauLabel = (val: number) => {
+    const labels = ['', 'Très mauvais', 'Mauvais', 'Moyen', 'Bon', 'Très bon'];
+    return labels[val] || val;
   };
 
   return (
     <Layout>
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-8"
-      >
-        <h1 className="text-foreground mb-2 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent inline-block">
+      <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+        <h1 className="text-foreground mb-2 text-sky-600 inline-block">
           Suivi quotidien
         </h1>
-        <p className="text-muted-foreground">Enregistrez les observations quotidiennes de votre enfant</p>
+        <p className="text-muted-foreground">
+          Enregistrez les observations du jour pour{' '}
+          {enfantId ? (
+            <span className="text-sky-600 font-medium">{enfantNom}</span>
+          ) : (
+            <a href="/children" className="text-sky-600 font-medium underline hover:text-sky-600">
+              sélectionner un enfant →
+            </a>
+          )}
+        </p>
+        {!enfantId && (
+          <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-sm">
+            ⚠️ Aucun enfant sélectionné. Allez dans la page <strong>Enfants</strong> et cliquez sur un profil.
+          </div>
+        )}
       </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+        {/* ── Formulaire ── */}
         <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.1 }}
+          initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}
           className="lg:col-span-2 bg-white/80 backdrop-blur-xl p-8 rounded-3xl shadow-xl border border-border/50"
         >
           <h3 className="text-foreground mb-6">Nouveau suivi</h3>
 
-          <form onSubmit={handleSubmit} className="space-y-8">
-            <div className="space-y-6">
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
-                      <Moon className="w-6 h-6 text-white" />
-                    </div>
-                    <label className="text-foreground">Heures de sommeil</label>
-                  </div>
-                  <span className="text-2xl bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                    {sleep}h
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="24"
-                  value={sleep}
-                  onChange={(e) => setSleep(Number(e.target.value))}
-                  className="w-full h-3 bg-gradient-to-r from-indigo-100 to-purple-100 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-gradient-to-r [&::-webkit-slider-thumb]:from-indigo-500 [&::-webkit-slider-thumb]:to-purple-600 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:cursor-pointer"
-                />
-              </div>
+          {/* Messages */}
+          {success && (
+            <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
+              <p className="text-emerald-600 text-sm">Suivi enregistré avec succès !</p>
+            </div>
+          )}
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl">
+              <p className="text-red-600 text-sm">{error}</p>
+            </div>
+          )}
 
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center shadow-lg">
-                      <Smile className="w-6 h-6 text-white" />
-                    </div>
-                    <label className="text-foreground">Comportement</label>
+          <form onSubmit={handleSubmit} className="space-y-7">
+            {/* Sommeil */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-sky-600 flex items-center justify-center shadow-lg">
+                    <Moon className="w-5 h-5 text-white" />
                   </div>
-                  <span className="text-2xl bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
-                    {behavior}/10
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min="1"
-                  max="10"
-                  value={behavior}
-                  onChange={(e) => setBehavior(Number(e.target.value))}
-                  className="w-full h-3 bg-gradient-to-r from-emerald-100 to-teal-100 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-gradient-to-r [&::-webkit-slider-thumb]:from-emerald-500 [&::-webkit-slider-thumb]:to-teal-600 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:cursor-pointer"
-                />
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg">
-                      <MessageCircle className="w-6 h-6 text-white" />
-                    </div>
-                    <label className="text-foreground">Communication</label>
+                  <div>
+                    <label className="text-foreground text-sm font-medium">Qualité du sommeil</label>
+                    <p className="text-xs text-muted-foreground">{niveauLabel(sleep)}</p>
                   </div>
-                  <span className="text-2xl bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
-                    {communication}/10
-                  </span>
                 </div>
-                <input
-                  type="range"
-                  min="1"
-                  max="10"
-                  value={communication}
-                  onChange={(e) => setCommunication(Number(e.target.value))}
-                  className="w-full h-3 bg-gradient-to-r from-amber-100 to-orange-100 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-gradient-to-r [&::-webkit-slider-thumb]:from-amber-500 [&::-webkit-slider-thumb]:to-orange-600 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:cursor-pointer"
-                />
+                <span className="text-xl font-semibold text-sky-600">
+                  {sleep}/5
+                </span>
               </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-rose-500 to-pink-500 flex items-center justify-center shadow-lg">
-                      <AlertCircle className="w-6 h-6 text-white" />
-                    </div>
-                    <label className="text-foreground">Nombre de crises</label>
-                  </div>
-                  <span className="text-2xl bg-gradient-to-r from-rose-600 to-pink-600 bg-clip-text text-transparent">
-                    {crises}
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="10"
-                  value={crises}
-                  onChange={(e) => setCrises(Number(e.target.value))}
-                  className="w-full h-3 bg-gradient-to-r from-rose-100 to-pink-100 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:bg-gradient-to-r [&::-webkit-slider-thumb]:from-rose-500 [&::-webkit-slider-thumb]:to-pink-600 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:cursor-pointer"
-                />
-              </div>
+              <input type="range" min="1" max="5" value={sleep}
+                onChange={(e) => setSleep(Number(e.target.value))}
+                className="w-full h-3 bg-sky-100 rounded-full appearance-none cursor-pointer accent-indigo-500"
+              />
             </div>
 
+            {/* Comportement */}
             <div>
-              <label htmlFor="notes" className="block mb-3 text-foreground">
-                Notes additionnelles
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center shadow-lg">
+                    <Smile className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <label className="text-foreground text-sm font-medium">Comportement</label>
+                    <p className="text-xs text-muted-foreground">{niveauLabel(behavior)}</p>
+                  </div>
+                </div>
+                <span className="text-xl font-semibold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+                  {behavior}/5
+                </span>
+              </div>
+              <input type="range" min="1" max="5" value={behavior}
+                onChange={(e) => setBehavior(Number(e.target.value))}
+                className="w-full h-3 bg-emerald-100 rounded-full appearance-none cursor-pointer accent-emerald-500"
+              />
+            </div>
+
+            {/* Communication */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg">
+                    <MessageCircle className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <label className="text-foreground text-sm font-medium">Communication</label>
+                    <p className="text-xs text-muted-foreground">{niveauLabel(communication)}</p>
+                  </div>
+                </div>
+                <span className="text-xl font-semibold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
+                  {communication}/5
+                </span>
+              </div>
+              <input type="range" min="1" max="5" value={communication}
+                onChange={(e) => setCommunication(Number(e.target.value))}
+                className="w-full h-3 bg-amber-100 rounded-full appearance-none cursor-pointer accent-amber-500"
+              />
+            </div>
+
+            {/* Crises */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-rose-500 to-pink-500 flex items-center justify-center shadow-lg">
+                    <AlertCircle className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <label className="text-foreground text-sm font-medium">Nombre de crises</label>
+                    <p className="text-xs text-muted-foreground">
+                      {crises === 0 ? 'Aucune crise' : `${crises} crise${crises > 1 ? 's' : ''}`}
+                    </p>
+                  </div>
+                </div>
+                <span className="text-xl font-semibold bg-gradient-to-r from-rose-600 to-pink-600 bg-clip-text text-transparent">
+                  {crises}
+                </span>
+              </div>
+              <input type="range" min="0" max="10" value={crises}
+                onChange={(e) => setCrises(Number(e.target.value))}
+                className="w-full h-3 bg-sky-100 rounded-full appearance-none cursor-pointer accent-rose-500"
+              />
+            </div>
+
+            {/* Notes */}
+            <div>
+              <label className="block mb-2 text-foreground text-sm font-medium">
+                Notes additionnelles <span className="text-muted-foreground font-normal">(optionnel)</span>
               </label>
               <textarea
-                id="notes"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="Observations, événements particuliers..."
-                rows={4}
-                className="w-full px-5 py-4 bg-white/50 border-2 border-border rounded-2xl focus:outline-none focus:border-primary focus:bg-white transition-all resize-none"
-              ></textarea>
+                placeholder="Observations, événements particuliers de la journée..."
+                rows={3}
+                className="w-full px-4 py-3 bg-white/50 border-2 border-border rounded-2xl focus:outline-none focus:border-primary focus:bg-white transition-all resize-none text-sm"
+              />
             </div>
 
             <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+              whileHover={{ scale: saving ? 1 : 1.02 }}
+              whileTap={{ scale: saving ? 1 : 0.98 }}
               type="submit"
-              className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-8 py-4 rounded-2xl shadow-xl hover:shadow-2xl transition-all"
+              disabled={saving || !enfantId}
+              className="flex items-center gap-2 bg-sky-600 text-white px-8 py-4 rounded-2xl shadow-xl hover:shadow-2xl transition-all disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <Save className="w-5 h-5" />
-              Enregistrer le suivi
+              {saving ? (
+                <><Loader2 className="w-5 h-5 animate-spin" /> Enregistrement...</>
+              ) : (
+                <><Save className="w-5 h-5" /> Enregistrer le suivi</>
+              )}
             </motion.button>
           </form>
         </motion.div>
 
+        {/* ── Calendrier / Info ── */}
         <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.1 }}
-          className="bg-white/80 backdrop-blur-xl p-8 rounded-3xl shadow-xl border border-border/50"
+          initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}
+          className="bg-white/80 backdrop-blur-xl p-8 rounded-3xl shadow-xl border border-border/50 flex flex-col gap-4"
         >
-          <h3 className="text-foreground mb-6">Calendrier</h3>
-          <div className="flex items-center justify-center p-8 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl mb-6">
-            <Calendar className="w-20 h-20 text-indigo-600" />
+          <h3 className="text-foreground mb-2">Résumé</h3>
+          <div className="flex items-center justify-center p-6 bg-gradient-to-br sky-50 rounded-2xl">
+            <Calendar className="w-16 h-16 text-indigo-400" />
           </div>
           <div className="space-y-3">
-            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl border border-indigo-100">
-              <span className="text-sm text-foreground">Aujourd'hui</span>
-              <span className="text-xs bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">04 Mai</span>
+            <div className="flex items-center justify-between p-3 bg-sky-50 rounded-2xl border border-sky-100">
+              <span className="text-sm text-foreground">Total suivis</span>
+              <span className="text-sky-600 font-semibold">{history.length}</span>
             </div>
-            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-2xl border border-emerald-100">
-              <span className="text-sm text-foreground">Suivi complété</span>
-              <span className="text-xs bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">3 jours</span>
+            <div className="flex items-center justify-between p-3 bg-emerald-50 rounded-2xl border border-emerald-100">
+              <span className="text-sm text-foreground">Dernier suivi</span>
+              <span className="text-emerald-600 text-xs font-medium">
+                {history[0]?.date || '—'}
+              </span>
             </div>
+            {history.length > 0 && (
+              <div className="flex items-center justify-between p-3 bg-amber-50 rounded-2xl border border-amber-100">
+                <span className="text-sm text-foreground">Moy. sommeil</span>
+                <span className="text-amber-600 font-semibold">
+                  {(history.reduce((s, h) => s + h.sleep, 0) / history.length).toFixed(1)}/5
+                </span>
+              </div>
+            )}
           </div>
         </motion.div>
       </div>
 
+      {/* ── Conseils IA ── */}
+      <AnimatePresence>
+        {conseilsIA && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+            className="bg-gradient-to-br sky-50 border border-sky-200 rounded-3xl p-6 mb-8"
+          >
+            <button
+              onClick={() => setShowConseils(!showConseils)}
+              className="w-full flex items-center justify-between"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-sky-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <Sparkles className="w-5 h-5 text-white" />
+                </div>
+                <h3 className="text-foreground">Conseils personnalisés générés par l'IA</h3>
+              </div>
+              {showConseils ? <ChevronUp className="w-5 h-5 text-sky-500" /> : <ChevronDown className="w-5 h-5 text-sky-500" />}
+            </button>
+            <AnimatePresence>
+              {showConseils && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                  className="mt-4 overflow-hidden"
+                >
+                  <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-line">
+                    {conseilsIA}
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Graphique ── */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
+        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
         className="bg-white/80 backdrop-blur-xl p-8 rounded-3xl shadow-xl border border-border/50 mb-8"
       >
-        <h3 className="text-foreground mb-6">Graphiques de progression</h3>
-        <ResponsiveContainer width="100%" height={350}>
-          <LineChart data={chartData}>
-            <defs>
-              <linearGradient id="sleepGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#4F46E5" stopOpacity={0.3} />
-                <stop offset="100%" stopColor="#4F46E5" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-            <XAxis dataKey="date" stroke="#64748B" />
-            <YAxis stroke="#64748B" />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: '#ffffff',
-                border: 'none',
-                borderRadius: '1rem',
-                boxShadow: '0 10px 40px rgba(0,0,0,0.1)',
-              }}
-            />
-            <Legend />
-            <Line type="monotone" dataKey="sleep" stroke="#4F46E5" strokeWidth={3} name="Sommeil" dot={{ fill: '#4F46E5', r: 5 }} />
-            <Line type="monotone" dataKey="behavior" stroke="#10B981" strokeWidth={3} name="Comportement" dot={{ fill: '#10B981', r: 5 }} />
-            <Line type="monotone" dataKey="communication" stroke="#F59E0B" strokeWidth={3} name="Communication" dot={{ fill: '#F59E0B', r: 5 }} />
-            <Line type="monotone" dataKey="crises" stroke="#EF4444" strokeWidth={3} name="Crises" dot={{ fill: '#EF4444', r: 5 }} />
-          </LineChart>
-        </ResponsiveContainer>
+        <h3 className="text-foreground mb-6">Évolution sur 7 jours</h3>
+        {chartData.length === 0 ? (
+          <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
+            Aucun suivi enregistré pour le moment
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+              <XAxis dataKey="date" stroke="#64748B" tick={{ fontSize: 12 }} />
+              <YAxis stroke="#64748B" domain={[0, 5]} tick={{ fontSize: 12 }} />
+              <Tooltip contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 40px rgba(0,0,0,0.1)' }} />
+              <Legend />
+              <Line type="monotone" dataKey="Sommeil" stroke="#4F46E5" strokeWidth={2.5} dot={{ r: 4 }} />
+              <Line type="monotone" dataKey="Comportement" stroke="#10B981" strokeWidth={2.5} dot={{ r: 4 }} />
+              <Line type="monotone" dataKey="Communication" stroke="#F59E0B" strokeWidth={2.5} dot={{ r: 4 }} />
+              <Line type="monotone" dataKey="Crises" stroke="#EF4444" strokeWidth={2.5} dot={{ r: 4 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
       </motion.div>
 
+      {/* ── Historique tableau ── */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
+        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
         className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl border border-border/50 overflow-hidden"
       >
-        <div className="p-8 border-b border-border">
+        <div className="p-6 border-b border-border flex items-center justify-between">
           <h3 className="text-foreground">Historique des suivis</h3>
+          {loadingHistory && <Loader2 className="w-5 h-5 text-indigo-400 animate-spin" />}
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gradient-to-r from-indigo-50 to-purple-50">
+            <thead className="bg-gradient-to-r sky-50">
               <tr>
-                <th className="text-left px-8 py-5 text-foreground">Date</th>
-                <th className="text-left px-8 py-5 text-foreground">Sommeil</th>
-                <th className="text-left px-8 py-5 text-foreground">Comportement</th>
-                <th className="text-left px-8 py-5 text-foreground">Communication</th>
-                <th className="text-left px-8 py-5 text-foreground">Crises</th>
+                <th className="text-left px-6 py-4 text-foreground text-sm">Date</th>
+                <th className="text-left px-6 py-4 text-foreground text-sm">Sommeil</th>
+                <th className="text-left px-6 py-4 text-foreground text-sm">Comportement</th>
+                <th className="text-left px-6 py-4 text-foreground text-sm">Communication</th>
+                <th className="text-left px-6 py-4 text-foreground text-sm">Crises</th>
+                <th className="text-left px-6 py-4 text-foreground text-sm">Notes</th>
               </tr>
             </thead>
             <tbody>
-              {history.map((entry, index) => (
-                <motion.tr
-                  key={index}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.4 + index * 0.1 }}
-                  className="border-b border-border hover:bg-gradient-to-r hover:from-indigo-50/50 hover:to-purple-50/50 transition-all"
-                >
-                  <td className="px-8 py-5 text-foreground">{entry.date}</td>
-                  <td className="px-8 py-5 text-muted-foreground">{entry.sleep}h</td>
-                  <td className="px-8 py-5">
-                    <span className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-full text-sm shadow-lg">
-                      {entry.behavior}/10
-                    </span>
+              {history.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground text-sm">
+                    Aucun suivi enregistré pour le moment
                   </td>
-                  <td className="px-8 py-5">
-                    <span className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full text-sm shadow-lg">
-                      {entry.communication}/10
-                    </span>
-                  </td>
-                  <td className="px-8 py-5 text-muted-foreground">{entry.crises}</td>
-                </motion.tr>
-              ))}
+                </tr>
+              ) : (
+                history.map((entry, index) => (
+                  <motion.tr
+                    key={entry.id ?? index}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.05 * index }}
+                    className="border-b border-border hover:bg-sky-50/30 transition-all"
+                  >
+                    <td className="px-6 py-4 text-foreground text-sm">{entry.date}</td>
+                    <td className="px-6 py-4">
+                      <span className="px-3 py-1 bg-sky-600 text-white rounded-full text-xs">
+                        {entry.sleep}/5
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="px-3 py-1 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-full text-xs">
+                        {entry.behavior}/5
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="px-3 py-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full text-xs">
+                        {entry.communication}/5
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-muted-foreground text-sm">{entry.crises}</td>
+                    <td className="px-6 py-4 text-muted-foreground text-xs max-w-xs truncate">
+                      {entry.notes || '—'}
+                    </td>
+                  </motion.tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

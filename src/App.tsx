@@ -6,6 +6,7 @@ import DashboardPage from './pages/DashboardPage';
 import ChildrenPage from './pages/ChildrenPage';
 import QuestionnairePage from './pages/QuestionnairePage';
 import ResultsPage from './pages/ResultsPage';
+import PlanPersonnalisePage from './pages/PlanPersonnalisePage';
 import TrackingPage from './pages/TrackingPage';
 import ResourcesPage from './pages/ResourcesPage';
 import AdminPage from './pages/AdminPage';
@@ -20,7 +21,6 @@ import QuestionnairesPage from './pages/admin/QuestionnairesPage';
 import AnalyticsPage from './pages/admin/AnalyticsPage';
 import AdminResourcesPage from './pages/admin/ResourcesPage';
 import PlansPage from './pages/admin/PlansPage';
-import SettingsPage from './pages/admin/SettingsPage';
 
 export default function App() {
   return (
@@ -32,7 +32,7 @@ export default function App() {
 
         {/* Login */}
         <Route path="/login" element={<LoginPage />} />
-        
+
         {/* Register */}
         <Route path="/register" element={<RegisterPage />} />
 
@@ -70,6 +70,15 @@ export default function App() {
           element={
             <ProtectedRoute allowedRole="parent">
               <ResultsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/plan"
+          element={
+            <ProtectedRoute allowedRole="parent">
+              <PlanPersonnalisePage />
             </ProtectedRoute>
           }
         />
@@ -162,15 +171,6 @@ export default function App() {
           element={
             <ProtectedRoute allowedRole="admin">
               <PlansPage />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/admin/settings"
-          element={
-            <ProtectedRoute allowedRole="admin">
-              <SettingsPage />
             </ProtectedRoute>
           }
         />

@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Baby, FileQuestion, BarChart3, BookOpen, ClipboardList, Settings, Shield, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, Baby, FileQuestion, BarChart3, BookOpen, ClipboardList, Shield, LogOut } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
@@ -10,7 +10,6 @@ const menuItems = [
   { icon: BarChart3, label: 'Résultats & Analytics', path: '/admin/analytics' },
   { icon: BookOpen, label: 'Ressources', path: '/admin/resources' },
   { icon: ClipboardList, label: 'Plans Personnalisés', path: '/admin/plans' },
-  { icon: Settings, label: 'Paramètres', path: '/admin/settings' },
 ];
 
 export function AdminSidebar() {
@@ -26,11 +25,11 @@ export function AdminSidebar() {
     <div className="w-72 bg-white/80 backdrop-blur-xl border-r border-border/50 h-screen fixed left-0 top-0 flex flex-col shadow-xl">
       <div className="p-8">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-rose-500 to-orange-500 rounded-xl flex items-center justify-center shadow-lg">
+          <div className="w-10 h-10 bg-sky-600 rounded-xl flex items-center justify-center shadow-lg">
             <Shield className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h1 className="bg-gradient-to-r from-rose-600 to-orange-600 bg-clip-text text-transparent">AutiGuide</h1>
+            <h1 className="text-sky-600">AutiGuide</h1>
             <p className="text-xs text-muted-foreground">Admin Panel</p>
           </div>
         </div>
@@ -50,16 +49,15 @@ export function AdminSidebar() {
             >
               <Link
                 to={item.path}
-                className={`flex items-center gap-4 px-4 py-3.5 rounded-xl mb-1 transition-all group relative overflow-hidden ${
-                  isActive
-                    ? 'bg-gradient-to-r from-rose-500 to-orange-500 text-white shadow-lg'
-                    : 'text-foreground hover:bg-gradient-to-r hover:from-rose-50 hover:to-orange-50'
-                }`}
+                className={`flex items-center gap-4 px-4 py-3.5 rounded-xl mb-1 transition-all group relative overflow-hidden ${isActive
+                    ? 'bg-sky-600 text-white shadow-lg'
+                    : 'text-foreground hover:bg-gradient-to-r hover:bg-sky-50'
+                  }`}
               >
                 {isActive && (
                   <motion.div
                     layoutId="admin-active-pill"
-                    className="absolute inset-0 bg-gradient-to-r from-rose-500 to-orange-500 rounded-xl"
+                    className="absolute inset-0 bg-sky-600 rounded-xl"
                     transition={{ type: "spring", stiffness: 300, damping: 30 }}
                   />
                 )}
@@ -72,9 +70,9 @@ export function AdminSidebar() {
       </nav>
 
       <div className="p-4 border-t border-border/50">
-        <button 
+        <button
           onClick={handleLogout}
-          className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-rose-600 hover:bg-rose-50 transition-all"
+          className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-sky-600 hover:bg-sky-50 transition-all"
         >
           <LogOut className="w-5 h-5" />
           <span>Déconnexion</span>

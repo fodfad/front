@@ -1,88 +1,94 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AdminLayout } from '../../components/AdminLayout';
-import { Plus, Target, TrendingUp, Calendar, User, Edit2, Trash2, X } from 'lucide-react';
+import { Target, TrendingUp, Calendar, User, Loader2, Sparkles, Eye, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import apiClient from '../../api/apiClient';
 
-interface Plan {
+interface PlanDB {
   id: number;
-  childName: string;
-  title: string;
-  objectives: number;
-  completedObjectives: number;
-  startDate: string;
-  nextReview: string;
-  progress: number;
+  titre: string;
+  description: string;
+  objectifs: string;
+  dateGeneration: string;
 }
 
-const initialPlans: Plan[] = [
-  { id: 1, childName: 'Emma Dupont', title: 'Plan de développement social', objectives: 8, completedObjectives: 5, startDate: '2024-01-15', nextReview: '2024-06-15', progress: 62 },
-  { id: 2, childName: 'Lucas Martin', title: 'Communication et langage', objectives: 12, completedObjectives: 7, startDate: '2024-02-01', nextReview: '2024-07-01', progress: 58 },
-  { id: 3, childName: 'Thomas Dubois', title: 'Gestion des émotions', objectives: 10, completedObjectives: 3, startDate: '2024-03-10', nextReview: '2024-08-10', progress: 30 },
-];
+interface EnfantAvecPlan {
+  enfantId: number;
+  enfantPrenom: string;
+  parentNom: string;
+  score: number;
+  niveauRisque: string;
+  dateEvaluation: string;
+  plan: PlanDB | null;
+}
+
+/** Couleur selon le niveau de risque */
+const niveauGradient = (niveau: string) => {
+  if (niveau === 'FAIBLE') return 'from-emerald-500 to-teal-500';
+  if (niveau === 'MOYEN') return 'from-orange-500 to-amber-500';
+  return 'from-red-500 to-rose-500';
+};
 
 export default function PlansPage() {
-  const [plans, setPlans] = useState<Plan[]>(initialPlans);
-  const [showModal, setShowModal] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [formData, setFormData] = useState({
-    childName: '',
-    title: '',
-    objectives: 1,
-    completedObjectives: 0,
-    startDate: '',
-    nextReview: ''
-  });
+  const [plans, setPlans] = useState<EnfantAvecPlan[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [viewingPlan, setViewingPlan] = useState<EnfantAvecPlan | null>(null);
 
-  const handleAddOrEditPlan = (e: React.FormEvent) => {
-    e.preventDefault();
-    const progress = Math.round((formData.completedObjectives / formData.objectives) * 100) || 0;
+  useEffect(() => {
+    chargerPlans();
+  }, []);
 
-    if (editingId) {
-      setPlans(plans.map(plan => 
-        plan.id === editingId 
-          ? { ...plan, ...formData, progress } 
-          : plan
-      ));
-    } else {
-      const newPlan: Plan = {
-        id: plans.length > 0 ? Math.max(...plans.map(p => p.id)) + 1 : 1,
-        ...formData,
-        progress
-      };
-      setPlans([...plans, newPlan]);
+  const chargerPlans = async () => {
+    setLoading(true);
+    try {
+      // 1. Charger tous les parents
+      const parentsRes = await apiClient.get('/parents');
+      const parents = parentsRes.data;
+
+      // 2. Pour chaque parent, charger ses enfants
+      const tousEnfants: any[] = [];
+      for (const parent of parents) {
+        try {
+          const enfantsRes = await apiClient.get(`/enfants/parent/${parent.id}`);
+          enfantsRes.data.forEach((e: any) => {
+            tousEnfants.push({ ...e, parentNom: `${parent.prenom} ${parent.nom}` });
+          });
+        } catch { }
+      }
+
+      // 3. Pour chaque enfant, charger son dernier résultat + plan
+      const resultats: EnfantAvecPlan[] = [];
+      for (const enfant of tousEnfants) {
+        try {
+          const resRes = await apiClient.get(`/resultat/enfant/${enfant.id}`);
+          if (Array.isArray(resRes.data) && resRes.data.length > 0) {
+            const dernierResultat = resRes.data[0]; // déjà trié du plus récent
+            // Charger le plan associé
+            let plan: PlanDB | null = null;
+            try {
+              const planRes = await apiClient.get(`/resultat/${dernierResultat.id}/plan`);
+              plan = planRes.data;
+            } catch { }
+
+            resultats.push({
+              enfantId: enfant.id,
+              enfantPrenom: enfant.prenom,
+              parentNom: enfant.parentNom,
+              score: dernierResultat.score,
+              niveauRisque: dernierResultat.niveauRisque,
+              dateEvaluation: dernierResultat.dateEvaluation,
+              plan,
+            });
+          }
+        } catch { }
+      }
+
+      setPlans(resultats);
+    } catch (err) {
+      console.error('Erreur chargement plans:', err);
+    } finally {
+      setLoading(false);
     }
-    closeModal();
-  };
-
-  const handleEdit = (plan: Plan) => {
-    setFormData({ 
-      childName: plan.childName, 
-      title: plan.title, 
-      objectives: plan.objectives,
-      completedObjectives: plan.completedObjectives,
-      startDate: plan.startDate,
-      nextReview: plan.nextReview
-    });
-    setEditingId(plan.id);
-    setShowModal(true);
-  };
-
-  const handleDelete = (id: number) => {
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer ce plan ?')) {
-      setPlans(plans.filter(plan => plan.id !== id));
-    }
-  };
-
-  const openAddModal = () => {
-    setFormData({ childName: '', title: '', objectives: 1, completedObjectives: 0, startDate: '', nextReview: '' });
-    setEditingId(null);
-    setShowModal(true);
-  };
-
-  const closeModal = () => {
-    setShowModal(false);
-    setFormData({ childName: '', title: '', objectives: 1, completedObjectives: 0, startDate: '', nextReview: '' });
-    setEditingId(null);
   };
 
   return (
@@ -93,123 +99,120 @@ export default function PlansPage() {
         className="mb-8 flex items-center justify-between"
       >
         <div>
-          <h1 className="text-foreground mb-2 bg-gradient-to-r from-rose-600 to-orange-600 bg-clip-text text-transparent inline-block">
+          <h1 className="text-foreground mb-2 text-sky-600 inline-block">
             Plans Personnalisés
           </h1>
-          <p className="text-muted-foreground">Créer et suivre les plans d'intervention individualisés</p>
+          <p className="text-muted-foreground">
+            Plans générés par l'IA pour chaque enfant évalué
+          </p>
         </div>
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={openAddModal}
-          className="flex items-center gap-2 bg-gradient-to-r from-rose-500 to-orange-500 text-white px-6 py-3 rounded-2xl shadow-lg hover:shadow-2xl transition-all"
-        >
-          <Plus className="w-5 h-5" />
-          Nouveau plan
-        </motion.button>
+        <div className="flex items-center gap-2 bg-violet-50 border border-violet-200 text-violet-700 text-sm px-4 py-2 rounded-xl">
+          <Sparkles className="w-4 h-4" />
+          {plans.length} plan{plans.length > 1 ? 's' : ''} générés
+        </div>
       </motion.div>
 
-      <div className="grid grid-cols-1 gap-6">
-        {plans.map((plan, index) => (
-          <motion.div
-            key={plan.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-            className="bg-white/80 backdrop-blur-xl p-8 rounded-3xl shadow-xl border border-border/50 relative"
-          >
-            <div className="absolute top-6 right-6 flex gap-2">
-              <button 
-                onClick={() => handleEdit(plan)}
-                className="p-2 text-rose-600 hover:bg-rose-100 rounded-lg transition-all"
-              >
-                <Edit2 className="w-4 h-4" />
-              </button>
-              <button 
-                onClick={() => handleDelete(plan.id)}
-                className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-all"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="flex items-start justify-between mb-6 pr-20">
-              <div>
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                    <Target className="w-6 h-6 text-white" />
+      {loading ? (
+        <div className="flex items-center justify-center h-48">
+          <Loader2 className="w-10 h-10 text-rose-400 animate-spin" />
+        </div>
+      ) : plans.length === 0 ? (
+        <div className="bg-white/80 backdrop-blur-xl p-16 rounded-3xl shadow-xl border border-border/50 text-center">
+          <Target className="w-16 h-16 text-rose-200 mx-auto mb-4" />
+          <p className="text-muted-foreground text-lg">Aucun plan disponible</p>
+          <p className="text-sm text-muted-foreground mt-2">
+            Les plans sont générés automatiquement après chaque questionnaire
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-6">
+          {plans.map((item, index) => (
+            <motion.div
+              key={item.enfantId}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.08 }}
+              className="bg-white/80 backdrop-blur-xl p-8 rounded-3xl shadow-xl border border-border/50"
+            >
+              <div className="flex items-start justify-between mb-6">
+                <div className="flex items-center gap-4">
+                  {/* Avatar enfant */}
+                  <div className="w-14 h-14 bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                    <span className="text-white text-xl font-bold">
+                      {item.enfantPrenom.charAt(0)}
+                    </span>
                   </div>
                   <div>
-                    <h3 className="text-foreground text-xl">{plan.title}</h3>
+                    <h3 className="text-foreground text-xl font-semibold">{item.enfantPrenom}</h3>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <User className="w-4 h-4" />
-                      <span>{plan.childName}</span>
+                      <span>Parent : {item.parentNom}</span>
                     </div>
                   </div>
                 </div>
+
+                {/* Bouton voir le plan */}
+                {item.plan && (
+                  <button
+                    onClick={() => setViewingPlan(item)}
+                    className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-5 py-2.5 rounded-2xl shadow-lg hover:shadow-2xl transition-all text-sm"
+                  >
+                    <Eye className="w-4 h-4" />
+                    Voir le plan
+                  </button>
+                )}
               </div>
 
-              <div className="flex items-center gap-2">
-                <div className={`w-16 h-16 rounded-xl flex items-center justify-center ${
-                  plan.progress >= 70
-                    ? 'bg-gradient-to-br from-emerald-500 to-teal-500'
-                    : plan.progress >= 40
-                    ? 'bg-gradient-to-br from-orange-500 to-amber-500'
-                    : 'bg-gradient-to-br from-red-500 to-rose-500'
-                } shadow-lg`}>
-                  <span className="text-white text-xl">{plan.progress}%</span>
+              {/* Infos résultat */}
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                <div className="p-4 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl border border-blue-100">
+                  <div className="text-sm text-blue-600 mb-1">Score TSA</div>
+                  <div className="text-2xl font-bold text-foreground">{item.score}</div>
+                </div>
+                <div className="p-4 bg-gradient-to-br from-violet-50 to-purple-50 rounded-2xl border border-violet-100">
+                  <div className="text-sm text-violet-600 mb-1">Niveau de risque</div>
+                  <span className={`inline-block px-3 py-1 rounded-full text-sm text-white bg-gradient-to-r ${niveauGradient(item.niveauRisque)} shadow-md`}>
+                    {item.niveauRisque}
+                  </span>
+                </div>
+                <div className="p-4 bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl border border-orange-100">
+                  <div className="flex items-center gap-2 text-sm text-orange-600 mb-1">
+                    <Calendar className="w-4 h-4" />
+                    Évaluation
+                  </div>
+                  <div className="text-sm font-medium text-foreground">{item.dateEvaluation}</div>
                 </div>
               </div>
-            </div>
 
-            <div className="grid grid-cols-4 gap-4 mb-6">
-              <div className="p-4 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl border border-blue-100">
-                <div className="text-sm text-blue-600 mb-1">Objectifs</div>
-                <div className="text-2xl text-foreground">{plan.objectives}</div>
-              </div>
-              <div className="p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl border border-emerald-100">
-                <div className="text-sm text-emerald-600 mb-1">Complétés</div>
-                <div className="text-2xl text-foreground">{plan.completedObjectives}</div>
-              </div>
-              <div className="p-4 bg-gradient-to-br from-violet-50 to-purple-50 rounded-2xl border border-violet-100">
-                <div className="flex items-center gap-2 text-sm text-violet-600 mb-1">
-                  <Calendar className="w-4 h-4" />
-                  <span>Début</span>
+              {/* Aperçu du plan */}
+              {item.plan ? (
+                <div className="bg-gradient-to-br from-violet-50 to-purple-50 border border-violet-200 rounded-2xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="w-4 h-4 text-violet-600" />
+                    <span className="text-sm font-medium text-violet-700">{item.plan.titre}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground line-clamp-2">
+                    {item.plan.description?.substring(0, 150)}...
+                  </p>
                 </div>
-                <div className="text-sm text-foreground">{plan.startDate}</div>
-              </div>
-              <div className="p-4 bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl border border-orange-100">
-                <div className="flex items-center gap-2 text-sm text-orange-600 mb-1">
-                  <TrendingUp className="w-4 h-4" />
-                  <span>Révision</span>
+              ) : (
+                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 text-center">
+                  <p className="text-sm text-muted-foreground">Aucun plan généré pour cet enfant</p>
                 </div>
-                <div className="text-sm text-foreground">{plan.nextReview}</div>
-              </div>
-            </div>
+              )}
+            </motion.div>
+          ))}
+        </div>
+      )}
 
-            <div className="mb-2 flex justify-between text-sm">
-              <span className="text-muted-foreground">Progression</span>
-              <span className="text-foreground">{plan.completedObjectives}/{plan.objectives} objectifs</span>
-            </div>
-            <div className="h-3 bg-gradient-to-r from-violet-100 to-purple-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-violet-500 to-purple-600 rounded-full transition-all"
-                style={{ width: `${plan.progress}%` }}
-              ></div>
-            </div>
-          </motion.div>
-        ))}
-      </div>
-
+      {/* Modal détail du plan */}
       <AnimatePresence>
-        {showModal && (
+        {viewingPlan && (
           <>
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={closeModal}
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setViewingPlan(null)}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
             />
             <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -217,102 +220,27 @@ export default function PlansPage() {
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none"
             >
-              <div className="bg-white rounded-3xl p-8 w-full max-w-xl mx-4 shadow-2xl pointer-events-auto max-h-[90vh] overflow-y-auto">
+              <div className="bg-white rounded-3xl p-8 w-full max-w-2xl mx-4 shadow-2xl pointer-events-auto max-h-[85vh] overflow-y-auto">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-foreground bg-gradient-to-r from-rose-600 to-orange-600 bg-clip-text text-transparent">
-                    {editingId ? 'Modifier le Plan' : 'Ajouter un Plan'}
-                  </h2>
-                  <button
-                    onClick={closeModal}
-                    className="p-2 hover:bg-accent rounded-xl transition-all"
-                  >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center">
+                      <Sparkles className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-foreground font-semibold">{viewingPlan.plan?.titre}</h3>
+                      <p className="text-sm text-muted-foreground">{viewingPlan.enfantPrenom} — {viewingPlan.niveauRisque}</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setViewingPlan(null)} className="p-2 hover:bg-accent rounded-xl">
                     <X className="w-5 h-5 text-muted-foreground" />
                   </button>
                 </div>
-
-                <form onSubmit={handleAddOrEditPlan} className="space-y-5">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block mb-2 text-foreground text-sm">Nom de l'enfant</label>
-                      <input
-                        type="text"
-                        value={formData.childName}
-                        onChange={(e) => setFormData({ ...formData, childName: e.target.value })}
-                        className="w-full px-4 py-3 bg-white/50 border-2 border-border rounded-2xl focus:outline-none focus:border-rose-500 transition-all"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block mb-2 text-foreground text-sm">Titre du plan</label>
-                      <input
-                        type="text"
-                        value={formData.title}
-                        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                        className="w-full px-4 py-3 bg-white/50 border-2 border-border rounded-2xl focus:outline-none focus:border-rose-500 transition-all"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block mb-2 text-foreground text-sm">Date de début</label>
-                      <input
-                        type="date"
-                        value={formData.startDate}
-                        onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                        className="w-full px-4 py-3 bg-white/50 border-2 border-border rounded-2xl focus:outline-none focus:border-rose-500 transition-all"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block mb-2 text-foreground text-sm">Date de révision</label>
-                      <input
-                        type="date"
-                        value={formData.nextReview}
-                        onChange={(e) => setFormData({ ...formData, nextReview: e.target.value })}
-                        className="w-full px-4 py-3 bg-white/50 border-2 border-border rounded-2xl focus:outline-none focus:border-rose-500 transition-all"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block mb-2 text-foreground text-sm">Total des objectifs</label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={formData.objectives}
-                        onChange={(e) => setFormData({ ...formData, objectives: parseInt(e.target.value) || 1 })}
-                        className="w-full px-4 py-3 bg-white/50 border-2 border-border rounded-2xl focus:outline-none focus:border-rose-500 transition-all"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block mb-2 text-foreground text-sm">Objectifs complétés</label>
-                      <input
-                        type="number"
-                        min="0"
-                        max={formData.objectives}
-                        value={formData.completedObjectives}
-                        onChange={(e) => setFormData({ ...formData, completedObjectives: parseInt(e.target.value) || 0 })}
-                        className="w-full px-4 py-3 bg-white/50 border-2 border-border rounded-2xl focus:outline-none focus:border-rose-500 transition-all"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex gap-3 pt-4">
-                    <button
-                      type="button"
-                      onClick={closeModal}
-                      className="flex-1 px-4 py-3 border-2 border-border rounded-2xl hover:bg-accent transition-all"
-                    >
-                      Annuler
-                    </button>
-                    <button
-                      type="submit"
-                      className="flex-1 px-4 py-3 bg-gradient-to-r from-rose-500 to-orange-500 text-white rounded-2xl hover:shadow-2xl transition-all"
-                    >
-                      {editingId ? 'Modifier' : 'Ajouter'}
-                    </button>
-                  </div>
-                </form>
+                <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-line">
+                  {viewingPlan.plan?.description}
+                </p>
+                <div className="mt-6 pt-4 border-t border-border text-xs text-muted-foreground">
+                  Généré le : {viewingPlan.plan?.dateGeneration}
+                </div>
               </div>
             </motion.div>
           </>

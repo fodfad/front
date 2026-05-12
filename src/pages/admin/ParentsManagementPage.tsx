@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AdminLayout } from '../../components/AdminLayout';
 import { Search, Filter, Eye, Edit2, Trash2, UserPlus, Baby, Mail, Phone, Calendar, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { parentService } from '../../api/parentService';
 
 interface Parent {
   id: number;
@@ -14,15 +15,8 @@ interface Parent {
   lastActive: string;
 }
 
-const initialParents: Parent[] = [
-  { id: 1, name: 'Marie Dupont', email: 'marie.dupont@email.com', phone: '+33 6 12 34 56 78', childrenCount: 2, status: 'active', joinDate: '2024-01-15', lastActive: 'Il y a 2h' },
-  { id: 2, name: 'Jean Martin', email: 'jean.martin@email.com', phone: '+33 6 98 76 54 32', childrenCount: 1, status: 'active', joinDate: '2024-02-20', lastActive: 'Il y a 1 jour' },
-  { id: 3, name: 'Sophie Bernard', email: 'sophie.b@email.com', phone: '+33 6 55 44 33 22', childrenCount: 3, status: 'active', joinDate: '2024-03-10', lastActive: 'Il y a 5h' },
-  { id: 4, name: 'Pierre Dubois', email: 'p.dubois@email.com', phone: '+33 6 11 22 33 44', childrenCount: 1, status: 'inactive', joinDate: '2024-01-05', lastActive: 'Il y a 2 semaines' },
-];
-
 export default function ParentsManagementPage() {
-  const [parents, setParents] = useState<Parent[]>(initialParents);
+  const [parents, setParents] = useState<Parent[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedParent, setSelectedParent] = useState<Parent | null>(null);
 
@@ -30,28 +24,59 @@ export default function ParentsManagementPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formData, setFormData] = useState({ name: '', email: '', phone: '', status: 'active' as 'active' | 'inactive' });
 
-  const handleAddOrEditParent = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (editingId) {
-      setParents(parents.map(parent => 
-        parent.id === editingId 
-          ? { ...parent, ...formData } 
-          : parent
-      ));
-    } else {
-      const newParent: Parent = {
-        id: parents.length > 0 ? Math.max(...parents.map(p => p.id)) + 1 : 1,
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        status: formData.status,
-        childrenCount: 0,
-        joinDate: new Date().toISOString().split('T')[0],
-        lastActive: 'À l\'instant'
-      };
-      setParents([...parents, newParent]);
+  useEffect(() => {
+    fetchParents();
+  }, []);
+
+  const fetchParents = async () => {
+    try {
+      const data = await parentService.getAllParents();
+      const mapped = data.map(p => ({
+        id: p.id!,
+        name: `${p.prenom} ${p.nom}`,
+        email: p.email,
+        phone: p.telephone || 'N/A',
+        childrenCount: p.enfants ? p.enfants.length : 0,
+        status: 'active' as const,
+        joinDate: p.dateInscription || 'N/A',
+        lastActive: 'N/A'
+      }));
+      setParents(mapped);
+    } catch (error) {
+      console.error('Error fetching parents:', error);
     }
-    closeModal();
+  };
+
+  const handleAddOrEditParent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const [prenom, ...nomParts] = formData.name.split(' ');
+    const nom = nomParts.join(' ') || prenom;
+
+    try {
+      if (editingId) {
+        await parentService.updateParent(editingId, {
+          nom: nom,
+          prenom: prenom,
+          email: formData.email,
+          telephone: formData.phone,
+          motDePasse: '123456', // default
+        });
+      } else {
+        await parentService.createParent({
+          nom: nom,
+          prenom: prenom,
+          email: formData.email,
+          telephone: formData.phone,
+          motDePasse: '123456', // default password
+          dateInscription: new Date().toISOString().split('T')[0]
+        });
+      }
+      fetchParents();
+      closeModal();
+    } catch (error) {
+      console.error('Error saving parent:', error);
+      alert('Erreur lors de la sauvegarde du parent');
+    }
   };
 
   const handleEdit = (parent: Parent) => {
@@ -60,9 +85,15 @@ export default function ParentsManagementPage() {
     setShowModal(true);
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (id: number) => {
     if (window.confirm('Êtes-vous sûr de vouloir supprimer ce parent ?')) {
-      setParents(parents.filter(parent => parent.id !== id));
+      try {
+        await parentService.deleteParent(id);
+        fetchParents();
+      } catch (error) {
+        console.error('Error deleting parent:', error);
+        alert('Erreur lors de la suppression');
+      }
     }
   };
 
@@ -91,7 +122,7 @@ export default function ParentsManagementPage() {
         className="mb-8 flex items-center justify-between"
       >
         <div>
-          <h1 className="text-foreground mb-2 bg-gradient-to-r from-rose-600 to-orange-600 bg-clip-text text-transparent inline-block">
+          <h1 className="text-foreground mb-2 text-sky-600 inline-block">
             Gestion des Parents
           </h1>
           <p className="text-muted-foreground">Gérer les comptes parents et leurs enfants</p>
@@ -100,7 +131,7 @@ export default function ParentsManagementPage() {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={openAddModal}
-          className="flex items-center gap-2 bg-gradient-to-r from-rose-500 to-orange-500 text-white px-6 py-3 rounded-2xl shadow-lg hover:shadow-2xl transition-all"
+          className="flex items-center gap-2 bg-sky-600 text-white px-6 py-3 rounded-2xl shadow-lg hover:shadow-2xl transition-all"
         >
           <UserPlus className="w-5 h-5" />
           Ajouter un parent
@@ -141,7 +172,7 @@ export default function ParentsManagementPage() {
       >
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gradient-to-r from-rose-50 to-orange-50">
+            <thead className="bg-gradient-to-r sky-50">
               <tr>
                 <th className="text-left px-8 py-5 text-foreground">Parent</th>
                 <th className="text-left px-8 py-5 text-foreground">Contact</th>
@@ -162,7 +193,7 @@ export default function ParentsManagementPage() {
                 >
                   <td className="px-8 py-5">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-gradient-to-br from-rose-500 to-orange-500 rounded-xl flex items-center justify-center shadow-lg">
+                      <div className="w-12 h-12 bg-sky-600 rounded-xl flex items-center justify-center shadow-lg">
                         <span className="text-white">
                           {parent.name.split(' ').map(n => n[0]).join('')}
                         </span>
@@ -202,7 +233,7 @@ export default function ParentsManagementPage() {
                       </button>
                       <button 
                         onClick={() => handleEdit(parent)}
-                        className="p-2 text-rose-600 hover:bg-rose-100 rounded-lg transition-all"
+                        className="p-2 text-sky-600 hover:bg-sky-100 rounded-lg transition-all"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
@@ -240,7 +271,7 @@ export default function ParentsManagementPage() {
             >
               <div className="bg-white rounded-3xl p-8 w-full max-w-2xl mx-4 shadow-2xl pointer-events-auto">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-foreground bg-gradient-to-r from-rose-600 to-orange-600 bg-clip-text text-transparent">
+                  <h2 className="text-foreground text-sky-600">
                     Détails du Parent
                   </h2>
                   <button
@@ -253,7 +284,7 @@ export default function ParentsManagementPage() {
 
                 <div className="space-y-6">
                   <div className="flex items-center gap-4">
-                    <div className="w-20 h-20 bg-gradient-to-br from-rose-500 to-orange-500 rounded-2xl flex items-center justify-center shadow-lg">
+                    <div className="w-20 h-20 bg-sky-600 rounded-2xl flex items-center justify-center shadow-lg">
                       <span className="text-white text-2xl">
                         {selectedParent.name.split(' ').map(n => n[0]).join('')}
                       </span>
@@ -323,7 +354,7 @@ export default function ParentsManagementPage() {
             >
               <div className="bg-white rounded-3xl p-8 w-full max-w-md mx-4 shadow-2xl pointer-events-auto">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-foreground bg-gradient-to-r from-rose-600 to-orange-600 bg-clip-text text-transparent">
+                  <h2 className="text-foreground text-sky-600">
                     {editingId ? 'Modifier le Parent' : 'Ajouter un Parent'}
                   </h2>
                   <button
@@ -393,7 +424,7 @@ export default function ParentsManagementPage() {
                     </button>
                     <button
                       type="submit"
-                      className="flex-1 px-4 py-3 bg-gradient-to-r from-rose-500 to-orange-500 text-white rounded-2xl hover:shadow-2xl transition-all"
+                      className="flex-1 px-4 py-3 bg-sky-600 text-white rounded-2xl hover:shadow-2xl transition-all"
                     >
                       {editingId ? 'Modifier' : 'Ajouter'}
                     </button>
